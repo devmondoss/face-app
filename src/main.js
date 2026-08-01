@@ -319,6 +319,14 @@ function renderResult() {
   const { measured, shape, quality, attrs, notes } = state.analysis;
   drawPhoto();
 
+  // Cada análisis nuevo vuelve a la primera pestaña.
+  for (const b of $('tabs').querySelectorAll('button'))
+    b.setAttribute('aria-selected', String(b.dataset.tab === 'cortes'));
+  for (const p of document.querySelectorAll('.tab-panel'))
+    p.classList.toggle('active', p.id === 'tab-cortes');
+  state.showMesh = false;
+  $('btn-mesh').textContent = 'Medidas';
+
   $('shape-name').textContent = shape.best.label;
   const pct = Math.round(shape.best.confidence * 100);
   $('confidence-fill').style.width = pct + '%';
@@ -333,8 +341,7 @@ function renderResult() {
     mixed.hidden = true;
   }
 
-  renderLightWarning(quality);
-  renderPoseWarning(measured.pose);
+  renderAlerts(quality, measured.pose);
   renderAttributes(attrs);
   renderGenderRow();
   renderMetrics(measured, shape);
@@ -342,38 +349,59 @@ function renderResult() {
   renderRecommendations();
 }
 
-function renderLightWarning(quality) {
-  const el = $('light-warn');
-  if (!quality.messages.length) {
-    el.hidden = true;
-    return;
-  }
-  el.hidden = false;
-  const title = quality.level === 'mala' ? 'Falta luz' : 'La luz no ayuda';
-  el.innerHTML =
-    `<strong>${title}</strong><ul>` +
-    quality.messages.map((m) => `<li>${m}</li>`).join('') +
-    '</ul>' +
-    (quality.level === 'mala'
-      ? '<p style="margin:8px 0 0">Con esta luz, los colores de pelo y ojos son poco confiables.</p>'
-      : '');
-}
+/**
+ * Los avisos se muestran como una línea plegada cada uno. Antes eran bloques
+ * de varias líneas que empujaban el resultado fuera de la primera pantalla;
+ * el detalle sigue estando, pero solo cuando se lo pide.
+ */
+function renderAlerts(quality, pose) {
+  const alerts = [];
 
-function renderPoseWarning(pose) {
-  const el = $('pose-warn');
+  if (quality.messages.length) {
+    const extra =
+      quality.level === 'mala'
+        ? '<p style="margin:7px 0 0">Con esta luz, los colores de pelo y ojos son poco confiables.</p>'
+        : '';
+    alerts.push({
+      title: quality.level === 'mala' ? 'Falta luz' : 'La luz no ayuda',
+      body: `<ul>${quality.messages.map((m) => `<li>${m}</li>`).join('')}</ul>${extra}`,
+    });
+  }
+
   const problems = [];
   if (Math.abs(pose.yaw) > 14) problems.push('la cara está girada hacia un costado');
   if (Math.abs(pose.pitch) > 16) problems.push('la cabeza está hacia arriba o hacia abajo');
   if (Math.abs(pose.roll) > 20) problems.push('la cabeza está muy ladeada');
-
   if (problems.length) {
-    el.hidden = false;
-    el.innerHTML = `<strong>La foto no es del todo frontal</strong> (${problems.join(
-      ' y '
-    )}). Las medidas pueden estar corridas — si podés, sacate otra mirando de frente.`;
-  } else {
-    el.hidden = true;
+    alerts.push({
+      title: 'La foto no es del todo frontal',
+      body: `<p style="margin:0">Detectamos que ${problems.join(
+        ' y '
+      )}. Las medidas pueden estar corridas — si podés, sacate otra mirando de frente.</p>`,
+    });
   }
+
+  $('alerts').innerHTML = alerts
+    .map(
+      (a) =>
+        `<details class="alert"><summary>${a.title}</summary><div class="alert-body">${a.body}</div></details>`
+    )
+    .join('');
+}
+
+/** Pestañas: muestran un tercio del contenido por vez en lugar de apilarlo. */
+function wireTabs() {
+  const nav = $('tabs');
+  nav.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-tab]');
+    if (!btn) return;
+    for (const b of nav.querySelectorAll('button')) b.setAttribute('aria-selected', String(b === btn));
+    for (const p of document.querySelectorAll('.tab-panel'))
+      p.classList.toggle('active', p.id === `tab-${btn.dataset.tab}`);
+    // La barra queda pegada arriba, así que al cambiar de pestaña se vuelve
+    // a su altura en vez de dejar al usuario a mitad del contenido anterior.
+    nav.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
 }
 
 function renderAttributes(attrs) {
@@ -406,11 +434,11 @@ function renderGenderRow() {
   const est = state.genderEstimate;
   const label = $('gender-label');
   // La estimación acierta ~2 de cada 3 veces (ver src/gender.js), así que
-  // mientras el usuario no la haya tocado siempre se invita a corregirla.
-  // Presentarla como resuelta sería darle más autoridad de la que tiene.
-  if (state.genderTouched) label.textContent = 'Recomendaciones para';
-  else if (est && !est.sure) label.textContent = 'Recomendaciones para — cambialo si no acertamos';
-  else label.textContent = 'Recomendaciones para — tocá para cambiar';
+  // mientras el usuario no la haya tocado se invita a corregirla. La pista va
+  // en una segunda línea chica: como texto corrido ocupaba tres renglones y
+  // estiraba la fila entera.
+  const hint = state.genderTouched ? '' : '<em>tocá para cambiar</em>';
+  label.innerHTML = `Cortes para${hint}`;
 
   const el = $('gender-select');
   el.innerHTML = '';
@@ -464,18 +492,28 @@ function renderRecommendations() {
   const data = getHaircuts(state.analysis.shape.best.key, state.gender);
 
   $('recommended').innerHTML = '';
-  data.recommended.forEach((h) => {
-    const card = document.createElement('div');
+  data.recommended.forEach((h, i) => {
+    // <details> nativo: plegado muestra lo justo para elegir, y el primero
+    // arranca abierto para que se entienda que se despliegan.
+    const card = document.createElement('details');
     card.className = 'card';
+    if (i === 0) card.open = true;
     card.innerHTML = `
-      <h4>${h.name}</h4>
-      <p class="card-desc">${h.desc}</p>
-      <p class="card-why">${h.why}</p>`;
+      <summary>
+        <span class="card-head">
+          <h4>${h.name}</h4>
+          <p class="card-desc">${h.desc}</p>
+        </span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </summary>
+      <div class="card-body">
+        <p class="card-why">${h.why}</p>
+      </div>`;
     const btn = document.createElement('button');
     btn.className = 'btn btn-glass';
     btn.textContent = 'Probarlo en mi foto';
     btn.addEventListener('click', () => openTryOn(h));
-    card.appendChild(btn);
+    card.querySelector('.card-body').appendChild(btn);
     $('recommended').appendChild(card);
   });
 
@@ -571,9 +609,10 @@ function wire() {
   $('btn-restart').addEventListener('click', () => show('screen-start'));
   $('btn-mesh').addEventListener('click', () => {
     state.showMesh = !state.showMesh;
-    $('btn-mesh').textContent = state.showMesh ? 'Ocultar medidas' : 'Ver medidas';
+    $('btn-mesh').textContent = state.showMesh ? 'Ocultar' : 'Medidas';
     drawPhoto();
   });
+  wireTabs();
 
   $('tryon-go').addEventListener('click', runTryOn);
   $('tryon-close').addEventListener('click', () => ($('tryon-modal').hidden = true));

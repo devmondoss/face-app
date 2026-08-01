@@ -86,28 +86,26 @@
 
       <!-- ══ 4. Resultado ══ -->
       <section class="screen" id="screen-result">
-        <div class="result-head">
-          <button class="btn btn-glass btn-sm" id="btn-restart">← Otra foto</button>
-        </div>
-
-        <div class="result-photo">
-          <canvas id="result-canvas"></canvas>
-          <button class="mesh-toggle" id="btn-mesh">Ver medidas</button>
-        </div>
-
-        <div class="warn" id="light-warn" hidden></div>
-        <div class="warn" id="pose-warn" hidden></div>
-
-        <div class="verdict glass">
-          <span class="verdict-kicker">Tu rostro es</span>
-          <h2 id="shape-name">—</h2>
-          <div class="confidence">
-            <div class="confidence-bar"><span id="confidence-fill"></span></div>
-            <span id="confidence-text"></span>
+        <!-- Cabecera compacta: foto y veredicto entran juntos en la primera
+             pantalla, sin necesidad de scrollear para saber el resultado. -->
+        <div class="hero-result">
+          <div class="result-photo">
+            <canvas id="result-canvas"></canvas>
+            <button class="icon-btn back" id="btn-restart" aria-label="Otra foto">←</button>
+            <button class="mesh-toggle" id="btn-mesh">Medidas</button>
           </div>
-          <p id="shape-blurb" class="verdict-blurb"></p>
-          <p id="mixed-note" class="mixed-note" hidden></p>
+          <div class="verdict">
+            <span class="verdict-kicker">Tu rostro es</span>
+            <h2 id="shape-name">—</h2>
+            <div class="confidence">
+              <div class="confidence-bar"><span id="confidence-fill"></span></div>
+              <span id="confidence-text"></span>
+            </div>
+          </div>
         </div>
+
+        <!-- Los avisos ocupan una línea; el detalle se abre al tocarlos. -->
+        <div id="alerts" class="alerts"></div>
 
         <div class="attrs" id="attrs"></div>
 
@@ -116,28 +114,36 @@
           <div class="segmented" id="gender-select" role="radiogroup" aria-label="Recomendaciones para"></div>
         </div>
 
-        <div id="feature-notes"></div>
+        <nav class="tabs" id="tabs" role="tablist">
+          <button role="tab" data-tab="cortes" aria-selected="true">Te favorecen</button>
+          <button role="tab" data-tab="evitar" aria-selected="false">Evitar</button>
+          <button role="tab" data-tab="detalles" aria-selected="false">Detalles</button>
+        </nav>
 
-        <details class="panel">
-          <summary>Las medidas que se usaron</summary>
-          <div class="panel-body" id="metrics-body"></div>
-        </details>
-
-        <h3 class="section-title">Cortes que te favorecen</h3>
-        <div id="recommended" class="cards"></div>
-
-        <h3 class="section-title section-title-warn">Mejor evitar</h3>
-        <ul id="avoid" class="avoid-list"></ul>
-
-        <div id="beard-block" hidden>
-          <h3 class="section-title">Barba que acompaña</h3>
-          <ul id="beard" class="avoid-list beard-list"></ul>
+        <div class="tab-panel active" id="tab-cortes" role="tabpanel">
+          <div id="recommended" class="cards"></div>
         </div>
 
-        <p class="disclaimer">
-          Es una guía basada en proporciones, no una regla.<br />
-          El mejor juez sigue siendo tu peluquero — llevale esta pantalla.
-        </p>
+        <div class="tab-panel" id="tab-evitar" role="tabpanel">
+          <ul id="avoid" class="avoid-list"></ul>
+          <div id="beard-block" hidden>
+            <h3 class="section-title">Barba que acompaña</h3>
+            <ul id="beard" class="avoid-list beard-list"></ul>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-detalles" role="tabpanel">
+          <p id="shape-blurb" class="verdict-blurb"></p>
+          <p id="mixed-note" class="mixed-note" hidden></p>
+          <div id="feature-notes"></div>
+          <div class="panel">
+            <div class="panel-body" id="metrics-body"></div>
+          </div>
+          <p class="disclaimer">
+            Es una guía basada en proporciones, no una regla.<br />
+            El mejor juez sigue siendo tu peluquero — llevale esta pantalla.
+          </p>
+        </div>
       </section>
     </div>
 

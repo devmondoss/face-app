@@ -10,6 +10,7 @@
     "build": "node scripts/make-icons.mjs && vite build && node -e \"for(const d of ['dist/_test','dist/_gender'])require('fs').rmSync(d,{recursive:true,force:true})\"",
     "test": "node scripts/smoke-test.mjs",
     "test:api": "node scripts/api-test.mjs",
+    "test:responsive": "node scripts/responsive-test.mjs",
     "preview": "vite preview --host"
   },
   "license": "MIT",

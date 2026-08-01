@@ -163,6 +163,7 @@ Con el servidor de desarrollo levantado en otra terminal:
 ```bash
 npm test                                    # flujo completo + bloqueo en escritorio
 npm run test:api                            # función serverless (no necesita clave)
+npm run test:responsive                     # scroll y desbordes en 6 modelos de iPhone
 node scripts/tilt-test.mjs                  # cabeza inclinada
 node scripts/attrs-eval.mjs                 # distribución de piel, pelo y ojos
 node scripts/calibrate.mjs                  # estadísticas y barrido de temperatura
@@ -187,6 +188,25 @@ Estos scripts encontraron errores reales que no se ven leyendo el código:
 | El 43% de los ojos salía "gris" | A esa resolución el iris se dessatura; el umbral de croma estaba demasiado flojo |
 | El vidrio se veía gris plano | El `::before` con `z-index:-1` quedaba detrás del fondo opaco del `body` |
 | El estimador de género daba vuelta a las personas | Los pesos elegidos a mano tenían el signo cambiado en mandíbula y mentón |
+| La página se cortaba a lo ancho en 5 de 6 iPhones | Los chips medían 402px fijos: `min-width:auto` de grid + texto con `nowrap` |
+
+### Scroll y tamaños de iPhone
+
+`responsive-test.mjs` mide el alto de la página como *pantallas de scroll*
+(`scrollHeight ÷ alto del viewport`) en seis modelos, del iPhone SE de 320px al
+Pro Max de 430px, y falla si algo desborda a lo ancho o si el inicio pide
+scroll. Resultado del rediseño:
+
+| | antes | después |
+| --- | --- | --- |
+| Peor caso (iPhone SE 320×568) | 6,0 pantallas | **2,3** |
+| Típico (iPhone 14/15) | 3,8 pantallas | **1,7** |
+| Desbordes horizontales | 5 de 6 modelos | **0** |
+
+Lo que lo consiguió: pestañas (*Te favorecen / Evitar / Detalles*) en vez de una
+columna única; tarjetas de corte plegables con `<details>`; avisos de una línea
+que se expanden al tocar; la foto acotada a `34dvh`; y tipografía y espaciado
+fluidos con `clamp()`.
 
 ---
 

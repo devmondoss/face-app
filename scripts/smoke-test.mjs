@@ -144,7 +144,15 @@ const r = await page.evaluate(() => ({
   avoid: document.querySelectorAll('#avoid li').length,
   scores: document.querySelectorAll('.score-row').length,
   metrics: document.querySelectorAll('.metric-row').length,
-  lightWarn: document.getElementById('light-warn').hidden ? null : document.getElementById('light-warn').textContent.trim().slice(0, 50),
+  alerts: [...document.querySelectorAll('#alerts details.alert summary')].map((s) => s.textContent.trim()),
+  tabs: [...document.querySelectorAll('#tabs button')].map((b) => ({
+    label: b.textContent.trim(),
+    selected: b.getAttribute('aria-selected') === 'true',
+  })),
+  panelsVisible: [...document.querySelectorAll('.tab-panel')].filter(
+    (p) => getComputedStyle(p).display !== 'none'
+  ).length,
+  cardsOpen: document.querySelectorAll('#recommended details.card[open]').length,
   canvasW: document.getElementById('result-canvas').width,
   gender: window.__lastAnalysis?.genderEstimate,
 }));
@@ -152,8 +160,9 @@ const r = await page.evaluate(() => ({
 console.log('  forma:  ', r.shape, '—', r.confidence);
 console.log('  género: ', r.gender?.label, `${Math.round((r.gender?.confidence || 0) * 100)}%`, r.gender?.sure ? '' : '(poco seguro)');
 for (const a of r.attrs) console.log(`  ${a.key.padEnd(7)}`, a.val);
-console.log('  cortes: ', r.cards, '| evitar:', r.avoid, '| formas:', r.scores);
-console.log('  aviso de luz:', r.lightWarn || 'ninguno');
+console.log('  cortes: ', r.cards, `(${r.cardsOpen} desplegada)`, '| evitar:', r.avoid, '| formas:', r.scores);
+console.log('  pestañas:', r.tabs.map((t) => (t.selected ? `[${t.label}]` : t.label)).join(' '));
+console.log('  avisos: ', r.alerts.length ? r.alerts.join(' / ') : 'ninguno');
 
 if (!r.shape || r.shape === '—') await fail('no se renderizó la forma del rostro', errors);
 if (r.attrs.length !== 4) await fail(`esperaba 4 atributos, hubo ${r.attrs.length}`, errors);
@@ -165,6 +174,22 @@ if (!r.avoid) await fail('falta la lista de "evitar"', errors);
 if (r.scores !== 8) await fail(`esperaba 8 formas puntuadas, hubo ${r.scores}`, errors);
 if (!r.metrics) await fail('no se renderizaron las medidas', errors);
 if (!r.canvasW) await fail('el canvas quedó vacío', errors);
+if (r.tabs.length !== 3) await fail(`esperaba 3 pestañas, hubo ${r.tabs.length}`, errors);
+if (r.panelsVisible !== 1) await fail(`hay ${r.panelsVisible} paneles visibles; debe haber 1`, errors);
+if (r.cardsOpen !== 1) await fail(`${r.cardsOpen} tarjetas desplegadas; solo la primera debe estarlo`, errors);
+
+// Las pestañas tienen que cambiar de panel de verdad.
+await page.evaluate(() => document.querySelector('#tabs button[data-tab="evitar"]').click());
+await new Promise((res) => setTimeout(res, 250));
+const tabSwitch = await page.evaluate(() => ({
+  activo: document.querySelector('.tab-panel.active')?.id,
+  cortesOculto: getComputedStyle(document.getElementById('tab-cortes')).display === 'none',
+}));
+if (tabSwitch.activo !== 'tab-evitar' || !tabSwitch.cortesOculto)
+  await fail(`la pestaña no cambió el panel: ${JSON.stringify(tabSwitch)}`, errors);
+console.log('✓ las pestañas cambian de panel');
+await page.evaluate(() => document.querySelector('#tabs button[data-tab="cortes"]').click());
+await new Promise((res) => setTimeout(res, 250));
 
 await page.screenshot({ path: `${SHOTS}/2-resultado.png`, fullPage: true });
 

@@ -96,9 +96,11 @@ const check = await page.evaluate(() => {
     medicion: ang(m.pointsAligned[L], m.pointsAligned[R]),
     roll: m.pose.roll,
     yaw: m.pose.yaw,
-    aviso: document.getElementById('pose-warn').hidden
-      ? null
-      : document.getElementById('pose-warn').textContent,
+    // Los avisos son <details> plegables dentro de #alerts; se lee el texto
+    // completo (título y cuerpo) de todos.
+    aviso: [...document.querySelectorAll('#alerts details.alert')]
+      .map((d) => d.textContent.replace(/\s+/g, ' ').trim())
+      .join(' | '),
   };
 });
 if (!check) await fail('la app no expuso el análisis (window.__lastAnalysis)');
@@ -118,7 +120,7 @@ if (Math.abs(check.yaw) > 8)
   await fail(`una inclinación pura se está midiendo como giro de ${check.yaw.toFixed(1)}°`);
 if (check.aviso && /girada hacia un costado/.test(check.aviso))
   await fail('avisa "cara girada" cuando en realidad está ladeada');
-console.log('  aviso de pose:', check.aviso ? check.aviso.slice(0, 60) + '…' : 'ninguno');
+console.log('  avisos mostrados:', check.aviso ? check.aviso.slice(0, 70) + '…' : 'ninguno');
 
 await page.screenshot({ path: `${SHOTS}/5-inclinada.png` });
 console.log('✓ dibujo y medición usan sistemas de coordenadas distintos, como corresponde');
