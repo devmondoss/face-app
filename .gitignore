@@ -1,0 +1,14 @@
+node_modules/
+dist/
+
+# Muestras de calibración: se regeneran con los scripts de scripts/
+public/_test/
+public/_gender/
+
+# public/fonts/ y src/fonts.css SÍ se versionan a propósito: son 68 kB y el
+# build de Vercel no puede depender de bajarlos de Google en cada despliegue.
+
+.vercel/
+
+# Capturas de la prueba de humo
+tmp-screenshots/

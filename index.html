@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0818" />
+    <meta
+      name="description"
+      content="Descubrí qué corte de pelo te queda mejor según la forma de tu cara. El análisis se hace entero en tu teléfono."
+    />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>¿Qué corte me queda?</title>
+  </head>
+  <body>
+    <!-- ══ Bloqueo en escritorio ══ -->
+    <section id="screen-desktop">
+      <div class="desktop-card">
+        <div class="icon" aria-hidden="true">📱</div>
+        <h1>Abrila desde el celular</h1>
+        <p>
+          Esta app está hecha solo para teléfono: necesita la cámara frontal y el
+          encuadre vertical para medir bien la cara.
+        </p>
+        <p>Escaneá el código o abrí esta misma dirección en tu celular.</p>
+        <div id="qr-slot"></div>
+      </div>
+    </section>
+
+    <div id="app">
+      <!-- ══ 1. Inicio ══ -->
+      <section class="screen active" id="screen-start">
+        <header class="hero">
+          <div class="hero-mark" aria-hidden="true">✂︎</div>
+          <h1>¿Qué corte<br />me queda?</h1>
+          <p class="hero-sub">Sacate una foto y te decimos cuál te favorece.</p>
+        </header>
+
+        <div class="privacy-badge glass">
+          <span class="dot" aria-hidden="true"></span>
+          <span>
+            <strong>Tu foto no sale del teléfono</strong>
+            Todo se analiza acá adentro. Sin cuenta, sin subir nada, funciona sin internet.
+          </span>
+        </div>
+
+        <div class="steps">
+          <div class="step glass"><b>1</b><span>Ponete de frente, con buena luz</span></div>
+          <div class="step glass"><b>2</b><span>Despejá la cara: pelo atrás, sin gorra ni lentes</span></div>
+          <div class="step glass"><b>3</b><span>Sacate la foto y listo</span></div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-primary" id="btn-camera">Abrir la cámara</button>
+          <button class="btn btn-glass" id="btn-upload">Elegir una foto</button>
+          <input type="file" id="file-input" accept="image/*" hidden />
+        </div>
+
+        <p class="disclaimer" id="unsupported-note" hidden></p>
+      </section>
+
+      <!-- ══ 2. Cámara ══ -->
+      <section class="screen" id="screen-camera">
+        <div class="cam-wrap">
+          <video id="video" playsinline autoplay muted></video>
+          <div class="cam-guide" aria-hidden="true"><div class="oval"></div></div>
+          <p class="cam-hint" id="cam-hint">Poné la cara dentro del óvalo</p>
+        </div>
+        <div class="cam-bar">
+          <button class="btn btn-glass btn-sm" id="btn-cam-back">Volver</button>
+          <button class="shutter" id="btn-shoot" aria-label="Sacar foto"></button>
+          <button class="btn btn-glass btn-sm" id="btn-cam-flip">Girar</button>
+        </div>
+      </section>
+
+      <!-- ══ 3. Analizando ══ -->
+      <section class="screen" id="screen-loading">
+        <div class="loader glass">
+          <div class="spinner"></div>
+          <p id="loading-text">Preparando…</p>
+        </div>
+      </section>
+
+      <!-- ══ 4. Resultado ══ -->
+      <section class="screen" id="screen-result">
+        <div class="result-head">
+          <button class="btn btn-glass btn-sm" id="btn-restart">← Otra foto</button>
+        </div>
+
+        <div class="result-photo">
+          <canvas id="result-canvas"></canvas>
+          <button class="mesh-toggle" id="btn-mesh">Ver medidas</button>
+        </div>
+
+        <div class="warn" id="light-warn" hidden></div>
+        <div class="warn" id="pose-warn" hidden></div>
+
+        <div class="verdict glass">
+          <span class="verdict-kicker">Tu rostro es</span>
+          <h2 id="shape-name">—</h2>
+          <div class="confidence">
+            <div class="confidence-bar"><span id="confidence-fill"></span></div>
+            <span id="confidence-text"></span>
+          </div>
+          <p id="shape-blurb" class="verdict-blurb"></p>
+          <p id="mixed-note" class="mixed-note" hidden></p>
+        </div>
+
+        <div class="attrs" id="attrs"></div>
+
+        <div class="gender-row">
+          <span class="label" id="gender-label">Recomendaciones para</span>
+          <div class="segmented" id="gender-select" role="radiogroup" aria-label="Recomendaciones para"></div>
+        </div>
+
+        <div id="feature-notes"></div>
+
+        <details class="panel">
+          <summary>Las medidas que se usaron</summary>
+          <div class="panel-body" id="metrics-body"></div>
+        </details>
+
+        <h3 class="section-title">Cortes que te favorecen</h3>
+        <div id="recommended" class="cards"></div>
+
+        <h3 class="section-title section-title-warn">Mejor evitar</h3>
+        <ul id="avoid" class="avoid-list"></ul>
+
+        <div id="beard-block" hidden>
+          <h3 class="section-title">Barba que acompaña</h3>
+          <ul id="beard" class="avoid-list beard-list"></ul>
+        </div>
+
+        <p class="disclaimer">
+          Es una guía basada en proporciones, no una regla.<br />
+          El mejor juez sigue siendo tu peluquero — llevale esta pantalla.
+        </p>
+      </section>
+    </div>
+
+    <!-- ══ Modal: prueba virtual ══ -->
+    <div class="modal-backdrop" id="tryon-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tryon-title">
+        <button class="modal-close" id="tryon-close" aria-label="Cerrar">×</button>
+        <h3 id="tryon-title">Probar el corte</h3>
+
+        <div class="warn" id="tryon-privacy">
+          <strong>Ojo:</strong> para generar la imagen tu foto se manda a un
+          servicio de IA. Es la única parte de la app que no es privada — el
+          análisis del rostro nunca sale del teléfono.
+        </div>
+
+        <div id="tryon-key" hidden>
+          <p class="modal-p">
+            Este servidor no tiene una clave configurada. Podés usar una propia de
+            Google AI Studio: se guarda solo en este teléfono.
+          </p>
+          <a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">
+            Sacar una clave gratis →
+          </a>
+          <label class="field-label" for="api-key">Clave de API</label>
+          <input type="password" id="api-key" class="input" placeholder="AIza…" autocomplete="off" />
+        </div>
+
+        <div id="tryon-result" hidden>
+          <div class="tryon-compare">
+            <figure><img id="tryon-before" alt="Foto original" /><figcaption>Antes</figcaption></figure>
+            <figure><img id="tryon-after" alt="Foto con el corte aplicado" /><figcaption>Después</figcaption></figure>
+          </div>
+          <a class="btn btn-glass btn-sm" id="tryon-download" download="corte.png">Descargar</a>
+        </div>
+
+        <p class="modal-error" id="tryon-error" hidden></p>
+
+        <button class="btn btn-primary" id="tryon-go">Generar</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

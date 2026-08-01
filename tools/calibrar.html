@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Calibración — proporciones medidas</title>
+    <style>
+      body { font-family: ui-monospace, monospace; background: #0d0f14; color: #eef1f6; padding: 20px; }
+      table { border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+      td, th { border: 1px solid #2a3140; padding: 5px 9px; text-align: right; }
+      th:first-child, td:first-child { text-align: left; }
+      h1 { font-size: 17px; }
+      .top { color: #d9a441; }
+    </style>
+  </head>
+  <body>
+    <h1>Calibración de proporciones</h1>
+    <p>Herramienta de desarrollo: mide fotos y muestra las proporciones crudas y
+      la clasificación, para ajustar los prototipos de <code>src/faceShape.js</code>.</p>
+    <input type="file" id="files" accept="image/*" multiple />
+    <div id="out"></div>
+
+    <script type="module">
+      import { FilesetResolver, FaceLandmarker } from '/node_modules/@mediapipe/tasks-vision/vision_bundle.mjs';
+      import { measureFace } from '/src/faceGeometry.js';
+      import { classifyFaceShape, describeFeatures } from '/src/faceShape.js';
+      import { estimateGender } from '/src/gender.js';
+      import {
+        analyzeImageQuality,
+        analyzeSkin,
+        analyzeHair,
+        analyzeEyes,
+      } from '/src/faceAttributes.js';
+
+      let landmarker;
+      async function init() {
+        const fileset = await FilesetResolver.forVisionTasks('/wasm');
+        landmarker = await FaceLandmarker.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: '/models/face_landmarker.task', delegate: 'CPU' },
+          runningMode: 'IMAGE',
+          numFaces: 1,
+          outputFacialTransformationMatrixes: true,
+        });
+        return true;
+      }
+
+      function loadImage(src) {
+        return new Promise((res, rej) => {
+          const i = new Image();
+          i.crossOrigin = 'anonymous';
+          i.onload = () => res(i);
+          i.onerror = rej;
+          i.src = src;
+        });
+      }
+
+      async function measureUrl(url) {
+        if (!landmarker) await init();
+        const img = await loadImage(url);
+        const c = document.createElement('canvas');
+        const s = Math.min(1, 1024 / Math.max(img.width, img.height));
+        c.width = Math.round(img.width * s);
+        c.height = Math.round(img.height * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+
+        const r = landmarker.detect(c);
+        const lms = r?.faceLandmarks?.[0];
+        if (!lms) return { error: 'sin cara' };
+        const m = measureFace(lms, c.width, c.height, r.facialTransformationMatrixes?.[0]?.data);
+        const shape = classifyFaceShape(m.ratios);
+        return {
+          ratios: m.ratios,
+          pose: m.pose,
+          best: shape.best.label,
+          confidence: shape.best.confidence,
+          second: shape.second.label,
+          secondConf: shape.second.confidence,
+          // distancias crudas: permiten reprocesar la softmax con otras
+          // temperaturas sin volver a correr el detector
+          distances: shape.all.map((s) => ({ label: s.label, distance: s.distance })),
+          notes: describeFeatures(m.ratios).map((n) => n.key),
+        };
+      }
+
+      window.measureUrl = measureUrl; // usado por los scripts de prueba
+
+      // Detección de color y calidad de luz, para scripts/attrs-eval.mjs.
+      window.measureAttrs = async (url) => {
+        if (!landmarker) await init();
+        const img = await loadImage(url);
+        const c = document.createElement('canvas');
+        const s = Math.min(1, 1024 / Math.max(img.width, img.height));
+        c.width = Math.round(img.width * s);
+        c.height = Math.round(img.height * s);
+        c.getContext('2d', { willReadFrequently: true }).drawImage(img, 0, 0, c.width, c.height);
+
+        const res = landmarker.detect(c);
+        const lms = res?.faceLandmarks?.[0];
+        if (!lms) return { error: 'sin cara' };
+        const m = measureFace(lms, c.width, c.height, res.facialTransformationMatrixes?.[0]?.data);
+
+        const skin = analyzeSkin(c, m.points, m);
+        return {
+          quality: analyzeImageQuality(c, m.points),
+          skin,
+          hair: analyzeHair(c, m.points, m, skin),
+          eyes: analyzeEyes(c, m.points),
+          gender: estimateGender(m.ratios),
+          ratios: m.ratios,
+          pose: m.pose,
+        };
+      };
+
+      document.getElementById('files').addEventListener('change', async (e) => {
+        const out = document.getElementById('out');
+        out.innerHTML = 'midiendo…';
+        const rows = [];
+        for (const f of e.target.files) {
+          const url = URL.createObjectURL(f);
+          const r = await measureUrl(url);
+          rows.push([f.name, r]);
+        }
+        out.innerHTML =
+          '<table><tr><th>foto</th><th>L/W</th><th>mand/pom</th><th>frente/pom</th><th>mentón°</th><th>yaw°</th><th>forma</th><th>%</th></tr>' +
+          rows
+            .map(([n, r]) =>
+              r.error
+                ? `<tr><td>${n}</td><td colspan="7">${r.error}</td></tr>`
+                : `<tr><td>${n}</td><td>${r.ratios.lengthOverWidth.toFixed(3)}</td><td>${r.ratios.jawOverCheek.toFixed(
+                    3
+                  )}</td><td>${r.ratios.foreheadOverCheek.toFixed(3)}</td><td>${r.ratios.chinAngle.toFixed(
+                    1
+                  )}</td><td>${r.pose.yaw.toFixed(1)}</td><td class="top">${r.best}</td><td>${(
+                    r.confidence * 100
+                  ).toFixed(0)}%</td></tr>`
+            )
+            .join('') +
+          '</table>';
+      });
+    </script>
+  </body>
+</html>

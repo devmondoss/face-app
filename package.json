@@ -1,0 +1,25 @@
+{
+  "name": "face-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Análisis privado de la forma del rostro con recomendaciones de corte de pelo. Todo corre en el dispositivo.",
+  "type": "module",
+  "scripts": {
+    "icons": "node scripts/make-icons.mjs",
+    "dev": "vite",
+    "build": "node scripts/make-icons.mjs && vite build && node -e \"for(const d of ['dist/_test','dist/_gender'])require('fs').rmSync(d,{recursive:true,force:true})\"",
+    "test": "node scripts/smoke-test.mjs",
+    "test:api": "node scripts/api-test.mjs",
+    "preview": "vite preview --host"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "puppeteer-core": "^25.4.0",
+    "vite": "^8.2.0"
+  },
+  "dependencies": {
+    "@google/genai": "^2.15.0",
+    "@mediapipe/tasks-vision": "^1.0.0"
+  }
+}
