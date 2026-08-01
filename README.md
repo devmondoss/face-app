@@ -137,22 +137,38 @@ género de nadie: muestra "Recomendaciones para" con el botón ya elegido y se
 cambia con un toque. Cuando la estimación es floja, el texto invita
 explícitamente a corregirla.
 
-**Precisión medida: 66,5%** (exactitud balanceada, validación cruzada dejando
-uno afuera, sobre 71 retratos etiquetados desde Wikidata). Es claramente mejor
-que tirar una moneda y claramente peor que un dato: alrededor de **1 de cada 3
-personas recibe la preselección equivocada**. Por eso la interfaz siempre
-invita a corregirla y nunca la presenta como resuelta.
+**Precisión medida: 76,1%** (exactitud balanceada, validación cruzada en 5
+pliegues sobre **756 rostros etiquetados** desde Wikidata — 395 hombres y 361
+mujeres, de varias ocupaciones y países). Margen de error ±4,4 puntos.
+Es claramente mejor que tirar una moneda y claramente peor que un dato:
+alrededor de **1 de cada 4 personas recibe la preselección equivocada**. Por
+eso la interfaz siempre invita a corregirla y nunca la presenta como resuelta.
 
-Sobre el mismo set, ajustando y midiendo con los mismos datos daba 79,8% — la
-diferencia con el 66,5% es puro sobreajuste, y es la razón por la que el script
-reporta el número validado.
+El modelo es una regresión logística sobre nueve proporciones. Se comparó
+contra dos alternativas más simples con la misma validación:
 
-Un hallazgo que salió de medir en vez de suponer: la intuición de "mandíbula
-ancha y mentón cuadrado = hombre" **no se sostiene** con estos landmarks; la
-separación medida iba en la dirección contraria. Toda la señal útil está en el
-grosor del labio y la separación ceja–ojo. La primera versión, con pesos
-elegidos a mano según esa intuición, clasificaba a un hombre como mujer con 72%
-de "confianza".
+| modelo | precisión validada |
+| --- | --- |
+| **regresión logística** | **76,1%** (H 75% / M 77%) |
+| descenso coordenado | 74,2% (H 68% / M 80%) |
+| centroides (LDA diagonal) | 71,1% (H 71% / M 71%) |
+
+Los rasgos que más separan son la **separación ceja–ojo** y el **grosor del
+labio**, ambos mayores en mujeres.
+
+### Por qué el tamaño de la muestra importó tanto
+
+Una versión anterior usaba 71 rostros, todos de políticos estadounidenses, y
+daba **66,5%** con solo 13 mujeres (margen de error ±27 puntos). Sobre esa
+muestra el ancho de mandíbula parecía separar en la dirección **contraria** a
+lo que dice la literatura, y así quedó documentado en su momento. Con 756
+rostros de fuentes variadas el rasgo se ordena como corresponde —mandíbula más
+ancha en hombres— y contribuye con peso positivo. **Era ruido de una muestra
+chica y homogénea, no un hallazgo.**
+
+También conviene recordar que ajustar y medir sobre los mismos datos infla el
+resultado: en la muestra chica daba 79,8% ajustado contra 66,5% validado. Por
+eso el script reporta siempre el número validado.
 
 ---
 
@@ -188,6 +204,7 @@ Estos scripts encontraron errores reales que no se ven leyendo el código:
 | El 43% de los ojos salía "gris" | A esa resolución el iris se dessatura; el umbral de croma estaba demasiado flojo |
 | El vidrio se veía gris plano | El `::before` con `z-index:-1` quedaba detrás del fondo opaco del `body` |
 | El estimador de género daba vuelta a las personas | Los pesos elegidos a mano tenían el signo cambiado en mandíbula y mentón |
+| Un cuarto de la muestra de género se perdía en silencio | El nombre de archivo se truncaba a 50 caracteres y colisionaba: 502 descargas, 382 archivos |
 | La página se cortaba a lo ancho en 5 de 6 iPhones | Los chips medían 402px fijos: `min-width:auto` de grid + texto con `nowrap` |
 
 ### Scroll y tamaños de iPhone
@@ -223,11 +240,24 @@ Para regenerar:
 
 ```bash
 node scripts/fetch-calibration-set.mjs   # muestra a public/_test/
-node scripts/fetch-gender-set.mjs        # muestra etiquetada a public/_gender/
+PER_CLASS=500 node scripts/fetch-gender-set.mjs   # muestra etiquetada a public/_gender/
 npm run dev                              # en otra terminal
 node scripts/calibrate.mjs               # imprime el bloque NORM a pegar
 node scripts/gender-eval.mjs             # imprime los pesos de género a pegar
 ```
+
+Dos detalles que hacen que bajar mil fotos tarde minutos y no horas
+(medidos con `scripts/probe-throughput.mjs`):
+
+- El **User-Agent tiene que cumplir la política de Wikimedia** — nombre,
+  versión y un contacto. Sin contacto rechazan la mitad de los pedidos con
+  429; con contacto, ninguno. Fue la diferencia entre 22 y 44 img/min.
+- La **concurrencia óptima es 3–4**. Con 8 en paralelo el servidor rechaza el
+  90% y el rendimiento cae por debajo del secuencial.
+
+`gender-eval.mjs` cachea las mediciones en `public/_gender/measurements.json`
+(~1000 fotos/min en el navegador). Medir es lo caro; probar modelos sobre datos
+ya medidos es instantáneo, así que se puede iterar sin volver a medir todo.
 
 `tools/calibrar.html` es una página de desarrollo para soltar fotos propias y
 ver las proporciones y colores medidos.
@@ -273,7 +303,9 @@ tools/calibrar.html     herramienta de desarrollo
 - El color de ojos es el dato menos confiable: a la resolución a la que se
   analiza, el iris ocupa pocos píxeles. Cuando es demasiado chico se dice "no
   se pudo ver" en lugar de adivinar.
-- La estimación de género es **estadística y falible**; por eso siempre es
-  corregible con un toque.
+- La estimación de género es **estadística y falible** (76% medido); por eso
+  siempre es corregible con un toque. La muestra con la que se ajustó son
+  retratos públicos de adultos: con caras de niños o selfies muy angulados va
+  a andar peor.
 - La prueba virtual depende del filtro de contenido del proveedor, que a veces
   rechaza fotos de personas reales.
